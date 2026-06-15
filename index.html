@@ -10,10 +10,13 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""></script>
-    <link rel="stylesheet" href="/Users/jlam/Downloads/bobin/dist/leaflet.css"/>
-    <script src="/Users/jlam/Downloads/bobin/dist/leaflet.js"></script>
+    <!-- <link rel="stylesheet" href="/Users/jlam/Downloads/bobin/dist/leaflet.css"/> -->
+    <!-- <script src="/Users/jlam/Downloads/bobin/dist/leaflet.js"></script> -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- <script src="https://unpkg.com/leaflet-knn@2.1.0/dist/leaflet-knn.js"></script> -->
+    
     <style>
-        #map { height: 800px; };
+        #map { height: 80vh; };
         h1 {
             text-align: center;
         }
@@ -25,10 +28,20 @@
             margin: 10px;
 
         }
+        #search-box {
+        position: absolute; top: 100px; right: 50px; z-index: 1000;
+        background: white; padding: 8px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+        }
+        #search-box input { width: 220px; padding: 4px; }
+        #search-box button { padding: 4px 8px; }
     </style>
 </head>
 <body>
     <h1>Know Your 287g</h1>
+    <div id="search-box">
+        <input id="city-input" type="text" placeholder="Enter US city name..." />
+        <button id="search-btn">Find Nearby</button>
+    </div>
     <div id="map"></div>
     <div class="cc">
         This work is licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a><img src="https://mirrors.creativecommons.org/presskit/icons/cc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/by.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/nc.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;"><img src="https://mirrors.creativecommons.org/presskit/icons/sa.svg" alt="" style="max-width: 1em;max-height:1em;margin-left: .2em;">
@@ -60,8 +73,10 @@
         const email_const = 13;
         const disclosure_const = 14;
 
-        // agency, name, position, phone number, email, contract disclosure
-        // for every row,
+        // --- Build markers + KNN index from your real dataset ---
+        const markers = [];
+        const features = [];
+
         for (let i = 0; i < df.length; i++) {
             const agency = df[i][agency_const];
             const position = df[i][position_const];
@@ -71,9 +86,95 @@
             const lat = df[i][lat_const];
             const long = df[i][long_const];
             const name = df[i][name_const];
-            // const station = df[i][station_const];
-            var marker = L.marker([lat, long]).addTo(map);
-            marker.bindPopup(`<b>Agency</b>: ${agency}<br><b>Name</b>: ${name}<br><b>Position</b>: ${position}<br><b>Phone Number</b>: ${phone_num}<br><b>Email</b>: ${email}<br><b>Contract Disclosure</b>: ${disclosure}<br>`).openPopup();
+
+            const marker = L.marker([lat, long]).addTo(map);
+            marker.bindPopup(`<b>Agency</b>: ${agency}<br><b>Name</b>: ${name}<br><b>Position</b>: ${position}<br><b>Phone Number</b>: ${phone_num}<br><b>Email</b>: ${email}<br><b>Contract Disclosure</b>: ${disclosure}<br>`);
+            markers.push(marker);
+
+            features.push({
+                type: "Feature",
+                properties: { index: i, agency, name },
+                geometry: { type: "Point", coordinates: [long, lat] }
+            });
+        }
+
+        function haversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) ** 2 +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                    Math.sin(dLon/2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function findNearest(lat, lon, k = 5) {
+            return df
+                .map((row, idx) => ({
+                    idx,
+                    dist: haversineDistance(lat, lon, row[lat_const], row[long_const])
+                }))
+                .sort((a, b) => a.dist - b.dist)
+                .slice(0, k);
+        }
+
+        const geojson = { type: "FeatureCollection", features };
+        // const knnIndex = leafletKnn(geojson);
+
+        // --- Search functionality ---
+        let highlightLayer = null;
+
+        async function runSearch() {
+            const city = document.getElementById('city-input').value.trim();
+            if (!city) return;
+
+            try {
+                const loc = await geocodeCity(city);
+
+                const nearest = findNearest(loc.lat, loc.lon, 5);
+
+                if (highlightLayer) map.removeLayer(highlightLayer);
+                highlightLayer = L.layerGroup();
+
+                const userMarker = L.marker([loc.lat, loc.lon]).bindPopup(`You searched: ${city}`);
+                highlightLayer.addLayer(userMarker);
+
+                nearest.forEach(({ idx, dist }) => {
+                    const lat = df[idx][lat_const];
+                    const lon = df[idx][long_const];
+                    const line = L.polyline([[loc.lat, loc.lon], [lat, lon]], { color: 'red', dashArray: '4' })
+                        .bindTooltip(`${dist.toFixed(1)} km`);
+                    highlightLayer.addLayer(line);
+                    markers[idx].openPopup();
+                });
+
+                highlightLayer.addTo(map);
+                map.setView([loc.lat, loc.lon], 9);
+
+            } catch (err) {
+                console.error("Search error:", err);
+                alert("Error: " + err.message);
+            }
+        }
+
+        document.getElementById('search-btn').addEventListener('click', runSearch);
+        document.getElementById('city-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') runSearch();
+        });
+
+        async function geocodeCity(city) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&q=${encodeURIComponent(city)}`;
+            console.log("Geocoding URL:", url);
+            const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+            console.log("Response status:", res.status);
+            if (!res.ok) {
+                const text = await res.text();
+                console.log("Response body:", text);
+                throw new Error(`Geocoding request failed: ${res.status}`);
+            }
+            const data = await res.json();
+            if (!data.length) throw new Error("City not found");
+            return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
         }
     </script>
 </body>
