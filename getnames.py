@@ -1,6 +1,6 @@
 import pandas as pd
 
-df = pd.read_csv('/Users/jlam/Downloads/bobin/pennsylvania.csv');
+df = pd.read_csv('/Users/jlam/Downloads/bobin/june_pa.csv');
 
 df = df.fillna('N/A')
 
