@@ -1,20 +1,29 @@
 import pandas as pd
 
-df = pd.read_csv('/Users/jlam/Downloads/bobin/june_pa.csv');
+states = ["arkansas", "alabama", "alaska", "colorado", "georgia"]
 
-df = df.fillna('N/A')
+result = ""
+for state in states: 
+    filename = f'/Users/jlam/Downloads/bobin/{state}.csv'
+    df = pd.read_csv(filename);
 
-masterlist = []
-count = 0
-error = 0
-for row in df.itertuples():
-    # add row to a giant list
-    newlist = []
-    for item in row:
-        newlist.append(item)
-        if item == "ERROR":
-            error = 1
-    if error != 1:
-        masterlist.append(newlist)
+    df = df.fillna('N/A')
 
-print(masterlist)
+    masterlist = []
+    count = 0
+    error = 0
+    for row in df.itertuples():
+        # add row to a giant list
+        newlist = []
+        for item in row:
+            newlist.append(item)
+            if item == "ERROR":
+                error = 1
+            if item == "N/A":
+                count += 1
+        if error != 1 and count < 7:
+            masterlist.append(newlist)
+
+    result += f'{state} = {masterlist}\n'
+
+print(result)

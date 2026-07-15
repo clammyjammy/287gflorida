@@ -11,6 +11,9 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""></script>
     <link rel="stylesheet" href="/Users/jlam/Downloads/bobin/dist/leaflet.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope&display=swap" rel="stylesheet">
     <script src="/Users/jlam/Downloads/bobin/dist/leaflet.js"></script>
     <style>
         .map {
@@ -27,7 +30,7 @@
 
         body {
             background-color: rgb(245, 242, 232);
-            font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif
+            font-family: 'Manrope';
         }
 
         .bodyody {
@@ -38,10 +41,10 @@
 
         h1 {
             text-align: center;
-            padding-top: 45px;
-            padding-bottom: 15px;
+            padding-top: 50px;
+            padding-bottom: 10px;
             color:rgb(35, 74, 11);
-            font-size: 40px;
+            font-size: 45px;
         }
 
         .cc {
@@ -150,6 +153,7 @@
             const phone_num_const = 12;
             const email_const = 13;
             const disclosure_const = 14;
+            const recency_const = 15;
 
             // --- Build markers + KNN index from your real dataset ---
             const markers = [];
@@ -164,6 +168,7 @@
                 const lat = df[i][lat_const];
                 const long = df[i][long_const];
                 const name = df[i][name_const];
+                const recency = df[i][recency_const];
 
                 const marker = L.marker([lat, long]).addTo(map);
                 marker.bindPopup(`<b>Agency</b>: ${agency}<br><b>Name</b>: ${name}<br><b>Position</b>: ${position}<br><b>Phone Number</b>: ${phone_num}<br><b>Email</b>: ${email}<br><b>Contract Disclosure</b>: ${disclosure}<br>`);
